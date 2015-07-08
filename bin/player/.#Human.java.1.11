@@ -1,0 +1,200 @@
+package player;
+
+import java.awt.Color;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.JOptionPane;
+
+import view.FortifyDialog;
+import view.RiskFrame;
+
+import map.Map;
+import map.Territory;
+
+/**
+ * An class that handles behaviors of a human player
+ * 
+ * @author Ross
+ * @extends Player
+ */
+public class Human extends Player implements ActionListener {
+	/**
+	 * Instantializes a new human player
+	 * 
+	 * @param name
+	 *            , the name of this player
+	 * @param color
+	 *            , the player's color
+	 * @param map
+	 *            , a reference to the map instance
+	 */
+
+	private boolean skipStage;
+	private int numFortify;
+
+	public Human(String name, Color color, Map map) {
+		super(name, color, map);
+		skipStage = false;
+	}
+
+	/**
+	 * Returns a point where the user has clicked on the map and figures out
+	 * where they are clicking on, and whether or not it is a valid move
+	 * 
+	 * @return the Point where the player clicked
+	 */
+	private Point getCoordinates() {
+		// TODO
+		return new Point(0, 0);
+	}
+
+	/**
+	 * Waits for a player to click on a defending and an attacking country and
+	 * creates an attack object out of that information
+	 * 
+	 * @return an Attack object that knows all relevant information about the
+	 *         attack
+	 */
+	public Attack decideAttack() {
+		RiskFrame.clearAllSelectedTerritories();
+
+		while ((RiskFrame.getSelectedTerritories()[0] == null || RiskFrame
+				.getSelectedTerritories()[1] == null)
+				&& !skipStage) {
+			Thread.yield();// while two territories are not selected
+		}
+
+		Attack attack = new Attack(RiskFrame.getSelectedTerritories()[0],
+				RiskFrame.getSelectedTerritories()[1]);
+		RiskFrame.clearAllSelectedTerritories();
+
+		if (skipStage) {
+			skipStage = false;
+			return null;
+		}
+
+		return attack;
+	}
+
+	/**
+	 * Waits for a player to click on a country to move units from and a country
+	 * to move units to, and creates a fortify object out of that information
+	 * 
+	 * @return a Fortify object that knows all relevant information about the
+	 *         fortify move
+	 */
+	public Fortify decideFortify() {
+		// RiskFrame.clearAllSelectedTerritories();
+		//
+		// while ((RiskFrame.getSelectedTerritories()[0] == null || RiskFrame
+		// .getSelectedTerritories()[1] == null)
+		// && !skipStage) {
+		// Thread.yield();// while two territories are not selected
+		// }
+		//
+		// boolean isValidNumber = false;
+		// int amount = 1;
+		// while (isValidNumber == false && !skipStage) {
+		// String amountString = JOptionPane
+		// .showInputDialog("How many troops do you want to move from\n"
+		// + RiskFrame.getSelectedTerritories()[0].getName()
+		// + " to "
+		// + RiskFrame.getSelectedTerritories()[1].getName()
+		// + "?");
+		// try {
+		// amount = new Integer(amountString);
+		// isValidNumber = true;
+		// } catch (NumberFormatException e) {
+		//
+		// }
+		// }
+		//
+		// Fortify fortify = new Fortify(RiskFrame.getSelectedTerritories()[0],
+		// RiskFrame.getSelectedTerritories()[1], amount);
+		// RiskFrame.clearAllSelectedTerritories();
+		//
+		// if (skipStage) {
+		// fortify = null;
+		// skipStage = false;
+		// }
+		//
+		// return fortify;
+
+		RiskFrame.clearAllSelectedTerritories();
+		while ((RiskFrame.getSelectedTerritories()[0] == null || RiskFrame
+				.getSelectedTerritories()[1] == null)
+				&& !skipStage) {
+			Thread.yield();// while two territories are not selected
+		}
+
+		if (skipStage) {
+			skipStage = false;
+			return null;
+		}
+		
+		Territory territory1 = RiskFrame.getSelectedTerritories()[0];
+		Territory territory2 = RiskFrame.getSelectedTerritories()[1];
+
+		boolean isFortifyAfterAttack = false;
+
+		FortifyDialog fortifyDialog = new FortifyDialog(this, territory1,
+				territory2, isFortifyAfterAttack);
+
+		while (fortifyDialog.isDisplayable()) {
+			Thread.yield();
+		}
+
+		return new Fortify(territory1, territory2, numFortify);
+	}
+
+	/**
+	 * Waits for a player to click on a country that it wants to reinforce, and
+	 * creates a Reinforcement object out of that information
+	 * 
+	 * @return a Reinforcement object that knows all relevant information about
+	 *         the reinforcement move
+	 */
+	public Reinforcement decideReinforcement() {
+		RiskFrame.clearAllSelectedTerritories();
+
+		Territory ref = RiskFrame.getSelectedTerritories()[0];
+
+		while (ref == null) {
+			ref = RiskFrame.getSelectedTerritories()[0];
+			Thread.yield();
+		}
+
+		Reinforcement reinforcement = new Reinforcement(ref, 1);
+		RiskFrame.clearAllSelectedTerritories();
+		return reinforcement;
+	}
+
+	public int decideFortifyAfterAttack(Territory attackingTerritory,
+			Territory defendingTerritory) {
+
+		FortifyDialog fortifyDialog = new FortifyDialog(this,
+				attackingTerritory, defendingTerritory, true);
+
+		while (fortifyDialog.isDisplayable()) {
+			Thread.yield();
+		}
+
+		return numFortify;
+	}
+
+	public void actionPerformed(ActionEvent e) {
+		skipStage = true;
+	}
+
+	public void setFortifyNum(int value) {
+		numFortify = value;
+	}
+
+	@Override
+	public Territory getPregameTerritory() {
+		return null;
+	}
+
+}

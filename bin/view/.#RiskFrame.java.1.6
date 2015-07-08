@@ -1,0 +1,49 @@
+package view;
+
+import java.awt.Dimension;
+
+import javax.swing.JFrame;
+
+import base.Game;
+
+public class RiskFrame extends JFrame {
+
+	private static MainPanel mainPanel;
+	
+	
+	
+	public RiskFrame(Game game) {
+
+		mainPanel = new MainPanel(game);
+		setContentPane(mainPanel);
+		this.setJMenuBar(new RiskMenuBar(game));
+		this.setPreferredSize(new Dimension(1024,720));
+		
+	}
+	
+	public static GameMapPanel getGameMapPanel(){
+		return mainPanel.getGameMapPanel();
+	}
+	
+	public static void fireDiceRollAnimation(DiceRoll roll){
+		mainPanel.getDiceTrayContainer().fireDiceRollAnimation(roll);
+	}
+	
+
+	public static void main(String[] args){
+		
+		
+		RiskFrame frame = new RiskFrame(new Game());
+		frame.setVisible(true);
+		frame.pack();
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.getGameMapPanel().initializeOpeningAnimation();
+		
+		int[] d1 = {3,3,3};
+		int[] d2 = {4,4,4};
+		DiceRoll a = new DiceRoll(d1,d2);
+		
+		frame.fireDiceRollAnimation(a);
+	}
+	
+}

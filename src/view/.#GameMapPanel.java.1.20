@@ -1,0 +1,690 @@
+package view;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.awt.RenderingHints;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
+import java.util.Scanner;
+import java.util.Set;
+
+import javax.imageio.ImageIO;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+import player.Player;
+
+import map.Territory;
+
+import base.Game;
+
+/**
+ * 
+ * 
+ * The GameMapPanel is the graphical Component where in-game animations,
+ * territories, and other game sequences appear. It contains the map image.
+ * 
+ * @author Phil
+ * 
+ */
+public class GameMapPanel extends JPanel {
+
+	private Game game;
+
+	protected BufferedImage offscreenMap, undoMap;
+
+	public static final double IMAGE_SIZE_RATIO = (double) 400 / 628;
+
+	protected static final Color OCEAN_COLOR = new Color(0, 0, 50);
+
+	private static final Color PERIPHERIES_COLOR = Color.DARK_GRAY;
+
+	// For construction purposesz
+	private static Scanner scanner;
+
+	private static String nextImagename;
+
+	private static Point nextPoint = new Point(0, 0);
+
+	private static final String TERRITORY_DIR = "territories(greyscale)";
+
+	private static final String EXT = ".png";
+
+	protected static Map<String, Point> territorylocations = new HashMap();
+
+	private static Map<String, Point> numeralPoints;
+
+	private static final String NUMERAL_POINTS_FILENAME = "numeralpoints.txt";
+
+	protected static Map<String, BufferedImage> originalTerritoryImageCache;
+
+	private static String hilightedTerritory;
+
+	private static final Color HILIGHTED_OUTLINE_COLOR = Color.white;
+
+	private static Map<String, BufferedImage> outlinedImageCache;
+
+	private static final String OUTLINED_DIR = "territories_highlighted";
+
+	public GameMapPanel() {
+
+		createImageCache();
+		initializeTerritoryLocations();
+//		initializeNumeralPoints();
+		initializeMap();
+		this.tintOutlinedTerritories();
+		addMouseListener(new ClickListener());
+
+		buildDebuggingScanner();
+
+		// Initializes the array containing the 2D coordinate space that
+		// maps each point of the map to a TerritoryID
+		new PointToTerritoryMapping(offscreenMap, originalTerritoryImageCache,
+				territorylocations);
+
+	}
+
+	private void buildDebuggingScanner() {
+		try {
+			scanner = new Scanner(new File("problems.txt"));
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		if (scanner.hasNextLine())
+			nextImagename = scanner.nextLine();
+		System.out.print("\nInput For: " + nextImagename + "\n");
+	}
+
+	private String eachTerritoryToString() {
+		String str = "";
+		for (String s : originalTerritoryImageCache.keySet()) {
+			str += s + "\n";
+		}
+		return str;
+	}
+
+	private void initializeMap() {
+		offscreenMap = ImageReader.readImage("Map_Panel_Image.png");
+
+		offscreenMap = new BufferedImage(
+				(int) (offscreenMap.getWidth() * (IMAGE_SIZE_RATIO)),
+				(int) (offscreenMap.getHeight() * (IMAGE_SIZE_RATIO)),
+				BufferedImage.TYPE_INT_ARGB);
+
+		setPreferredSize(new Dimension(offscreenMap.getWidth(), offscreenMap
+				.getHeight()));
+		setMinimumSize(getPreferredSize());
+		setMaximumSize(getPreferredSize());
+		setSize(getPreferredSize());
+	}
+
+	protected void initializeOpeningAnimation() {
+
+		int randomR = (int) DiceRoll.generateRandomNumber(0, 255);
+		int randomG = (int) DiceRoll.generateRandomNumber(0, 255);
+		int randomB = (int) DiceRoll.generateRandomNumber(0, 255);
+
+		drawOcean(offscreenMap);
+		drawPeripheralTerritories(offscreenMap);
+		tintAllTerritories(Color.black);
+
+	}
+
+	private static BufferedImage tintPeripheralTerritories() {
+		BufferedImage im = ImageReader.readImage("peripheries(greyscale).png");
+
+		java.util.List<BufferedImage> single = new java.util.ArrayList<BufferedImage>(
+				1);
+		single.add(im);
+		im = TerritoryTinter.tintImages(single, GameMapPanel.PERIPHERIES_COLOR)
+				.get(0);
+		return im;
+	}
+
+	private void tintOutlinedTerritories() {
+
+		TerritoryTinter.tintImages(this.outlinedImageCache,
+				HILIGHTED_OUTLINE_COLOR);
+	}
+
+	private static void drawPeripheralTerritories(BufferedImage offscreenMap) {
+		Graphics2D g = offscreenMap.createGraphics();
+		g.drawImage(tintPeripheralTerritories(), 0, 0, offscreenMap.getWidth(),
+				offscreenMap.getHeight(), null);
+		g.dispose();
+	}
+
+	private void drawOcean(BufferedImage offscreenMap) {
+
+		Graphics2D g = offscreenMap.createGraphics();
+		g.setColor(GameMapPanel.OCEAN_COLOR);
+		g.fillRect(0, 0, getWidth(), getHeight());
+		g.dispose();
+	}
+
+	private void createImageCache() {
+
+		originalTerritoryImageCache = new HashMap<String, BufferedImage>();
+		outlinedImageCache = new HashMap<String, BufferedImage>();
+
+		BufferedImage rescaled = null;
+		Graphics g = null;
+
+		for (String field : GameMapPanel.getAllTerritoriesLowerCase()) {
+			BufferedImage b = ImageReader.readImage(TERRITORY_DIR + "/"
+					+ fieldToFilename(field));
+
+			rescaled = new BufferedImage(
+					(int) (b.getWidth() * (IMAGE_SIZE_RATIO)), (int) (b
+							.getHeight() * (IMAGE_SIZE_RATIO)),
+					BufferedImage.TYPE_INT_ARGB);
+			g = rescaled.getGraphics();
+
+			((Graphics2D) g).setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+					RenderingHints.VALUE_ANTIALIAS_ON);
+			g.drawImage(b, 0, 0, rescaled.getWidth(), rescaled.getHeight(),
+					this);
+
+			g.dispose();
+
+			originalTerritoryImageCache.put(field.toLowerCase(), rescaled);
+		}
+
+		for (String field : GameMapPanel.getAllTerritoriesLowerCase()) {
+			BufferedImage b = ImageReader.readImage(OUTLINED_DIR + "/"
+					+ fieldToFilename(field));
+
+			rescaled = new BufferedImage(
+					(int) (b.getWidth() * (IMAGE_SIZE_RATIO)), (int) (b
+							.getHeight() * (IMAGE_SIZE_RATIO)),
+					BufferedImage.TYPE_INT_ARGB);
+			g = rescaled.getGraphics();
+
+			((Graphics2D) g).setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+					RenderingHints.VALUE_ANTIALIAS_ON);
+			g.drawImage(b, 0, 0, rescaled.getWidth(), rescaled.getHeight(),
+					this);
+
+			g.dispose();
+
+			outlinedImageCache.put(field.toLowerCase(), rescaled);
+		}
+
+	}
+
+	/**
+	 * 
+	 * Updates the view's representation of the game state, most significantly
+	 * who owns which territory and how many troops there are in each territory. \
+	 * 
+	 * @param game -
+	 *            the Game object
+	 */
+	public void update(Game game) {
+
+		updateTerritoryColors(game);
+		updateTerritoryNumerals(game);
+
+	}
+
+	private void updateTerritoryColors(Game game) {
+
+		List<Player> playerList = game.getAllPlayers();
+
+		List<Territory> territoryList = null;
+
+		Color playerColor = null;
+
+		List<String> territoriesFields = null;
+
+		for (Player p : playerList) {
+
+			territoryList = p.getTerritoriesOwned();
+
+			playerColor = p.getColor();
+
+			territoriesFields = new ArrayList(territoryList.size());
+
+			for (Territory t : territoryList) {
+
+				territoriesFields.add(t.getName().toLowerCase());
+			}
+			tintTerritories(territoriesFields, playerColor);
+
+		}
+	}
+
+	private void updateTerritoryNumerals(Game game) {
+		List<Player> playerList = game.getAllPlayers();
+		List<Territory> territoryList = null;
+
+		int size = 0;
+
+		for (Player p : playerList) {
+			territoryList = p.getTerritoriesOwned();
+
+			for (Territory t : territoryList) {
+				size = t.getTroopsOnTerritory();
+				this.drawNumberFor(t.getName().toLowerCase(), size);
+			}
+
+		}
+
+	}
+
+	private void updateSelectedTerritory() {
+
+	}
+
+	/**
+	 * 
+	 * Outlines a territory's border
+	 * 
+	 * @param territory -
+	 *            the territory to outline
+	 */
+	public void outlineTerritory(Territory territory) {
+
+	}
+
+	/**
+	 * Clears all outlined territories
+	 */
+	public void clearOutlinedTerritories() {
+
+	}
+
+	/**
+	 * Draws a visual representation of an invasion
+	 * 
+	 * @param attacker -
+	 *            the attacking territory
+	 * @param defender -
+	 *            the defending territory
+	 */
+	public void drawInvasion(Territory attacker, Territory defender) {
+
+	}
+
+	/**
+	 * 
+	 * Clears all drawn invasions.
+	 * 
+	 */
+	public void clearDrawnInvasions() {
+
+	}
+
+	/**
+	 * Clears the dice tray
+	 */
+	public void clearDice() {
+
+	}
+
+	/**
+	 * Fires a sound effect
+	 * 
+	 * @param soundEffect -
+	 *            The type of sound effect specified in SoundEffect
+	 */
+	public void fireSoundEffect(Enum<SoundEffect> soundEffect) {
+
+	}
+
+	public void paintComponent(Graphics g) {
+
+		Graphics2D offscreen = offscreenMap.createGraphics();
+
+		offscreen.dispose();
+
+		((Graphics2D) g).setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+				RenderingHints.VALUE_ANTIALIAS_ON);
+
+		g.drawImage(offscreenMap, 0, 0, offscreenMap.getWidth(), offscreenMap
+				.getHeight(), this);
+
+	}
+
+	private class ClickListener implements MouseListener {
+
+		public void mouseClicked(MouseEvent arg0) {
+
+			int button = arg0.getButton();
+
+			processMouseClick(arg0);
+
+			// debuggingOperation(arg0);
+		}
+
+		public void mouseEntered(MouseEvent arg0) {
+			// TODO Auto-generated method stub
+
+		}
+
+		public void mouseExited(MouseEvent arg0) {
+			// TODO Auto-generated method stub
+
+		}
+
+		public void mousePressed(MouseEvent arg0) {
+			// TODO Auto-generated method stub
+
+		}
+
+		public void mouseReleased(MouseEvent arg0) {
+			// TODO Auto-generated method stub
+
+		}
+
+	}
+
+	private void processMouseClick(MouseEvent arg0) {
+		int button = arg0.getButton();
+
+		switch (button) {
+
+		case 1:
+
+			hilightTerritoryByName(PointToTerritoryMapping
+					.getNameOfTerritoryAt(arg0.getX(), arg0.getY()));
+			break;
+
+		case 2:
+
+			break;
+
+		}
+	}
+
+	private void hilightTerritory(Territory t) {
+
+		String name = t.getName();
+
+		if (name.equals(hilightedTerritory)) {
+			clearOutlinedTerritories();
+		} else {
+
+			hilightTerritoryByName(t.getName());
+		}
+	}
+
+	private void hilightTerritoryByName(String name) {
+		name = name.toLowerCase();
+
+		if(name.equals("ocean")){
+			return;
+		}
+		
+		this.overlayImageAt(territorylocations.get(fieldToFilename(name)),
+				outlinedImageCache.get(name), true, name);
+	}
+
+	private void debuggingOperation(MouseEvent arg0) {
+
+		;
+		int button = arg0.getButton();
+		if (button == 1) {
+			if (scanner.hasNextLine()) {
+				GameMapPanel.numeralPoints.put(nextImagename, nextPoint);
+				System.out.println("successfully put:" + nextImagename + " "
+						+ nextPoint);
+				nextImagename = scanner.nextLine();
+				System.out.print("\nInput For: " + nextImagename + "\n");
+			} else {
+				GameMapPanel.numeralPoints.put(nextImagename, nextPoint);
+				System.out.println("successfully put:" + nextImagename + " "
+						+ nextPoint);
+
+				ObjectRW.writeObject(numeralPoints,
+						this.NUMERAL_POINTS_FILENAME);
+				System.out.println("finished writing points");
+			}
+		} else if (button == 3) {
+			replaceCanvasWith(ImageReader.readImage("Map_Panel_Image.png"));
+			System.out.print("\nInput For: " + nextImagename + "\n");
+			undoMap = offscreenMap;
+		} else if (button == 2) {
+			overlayImageAt(arg0.getPoint(), ImageReader
+					.readImage("territories(greyscale)/"
+							+ fieldToFilename(nextImagename)), true,
+					nextImagename);
+			nextPoint = arg0.getPoint();
+		}
+	}
+
+	private static void writePointsToDisk() {
+		ObjectOutputStream fout = null;
+		try {
+			fout = new ObjectOutputStream(new FileOutputStream(new File(
+					"territorypoints.dat")));
+			fout.writeObject(territorylocations);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void initializeTerritoryLocations() {
+
+		ObjectInputStream fin = null;
+
+		try {
+			fin = new ObjectInputStream(new FileInputStream(new File(
+					"territorypoints.dat")));
+			GameMapPanel.territorylocations = (Map<String, Point>) fin
+					.readObject();
+			rescalePoints(territorylocations);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException c) {
+			c.printStackTrace();
+		}
+
+	}
+
+	private static void rescalePoints(Map<String, Point> points) {
+		for (String s : points.keySet()) {
+			Point p = points.get(s);
+			p.x = (int) (p.x * IMAGE_SIZE_RATIO);
+			p.y = (int) (p.y * IMAGE_SIZE_RATIO);
+		}
+	}
+
+	private void tintAllTerritories(Color c) {
+		tintTerritories(getAllTerritoriesLowerCase(), c);
+
+	}
+
+	private static Map<String, BufferedImage> imageMapFromFields(
+			Collection<String> fields) {
+
+		Map<String, BufferedImage> intersection = new HashMap();
+		for (String field : fields) {
+
+			field = field.toLowerCase();
+
+			BufferedImage next = originalTerritoryImageCache.get(field);
+
+			if (next == null) {
+				throw new IllegalArgumentException("NO SUCH FIELD: " + field);
+			}
+
+			intersection.put(field, next);
+		}
+		return intersection;
+	}
+
+	private void tintTerritory(String field, Color c) {
+		List<String> fields = new ArrayList(1);
+		fields.add(field.toLowerCase());
+		tintTerritories(fields, c);
+	}
+
+	private void tintTerritories(Collection<String> territoriesFields, Color c) {
+
+		Map<String, BufferedImage> imageMap = imageMapFromFields(territoriesFields);
+
+		TerritoryTinter.tintImages(imageMap, c);
+
+		for (String territoryField : territoriesFields) {
+			overlayTerritory(territoryField, false, imageMap);
+		}
+		repaint();
+	}
+
+	private static Collection<String> getAllTerritoriesLowerCase() {
+		return TerritoryTinter.getAllTerritoriesByStringLowerCase();
+	}
+
+	private void overlayTerritory(String field, boolean repaint,
+			Map<String, BufferedImage> tintedImageMap) {
+
+		BufferedImage theImage = tintedImageMap.get(field);
+
+		Point loc = GameMapPanel.territorylocations.get(fieldToFilename(field));
+
+		overlayImageAt(loc, theImage, repaint, field);
+	}
+
+	/**
+	 * 
+	 * @param field
+	 * @return
+	 */
+	protected static String fieldToFilename(String field) {
+		return field.toLowerCase() + EXT;
+	}
+
+	private void tintTerritoriesByFile(Collection<String> filenames, Color c) {
+		for (String s : filenames) {
+			tintTerritoryByFile(s, c, false);
+		}
+	}
+
+	private void tintTerritoryByFile(String filename, Color c, boolean repaint) {
+		BufferedImage theImage = ImageReader.readImage(TERRITORY_DIR + "/"
+				+ filename);
+
+		Point loc = GameMapPanel.territorylocations.get(filename);
+
+		overlayImageAt(loc, theImage, repaint, filename);
+	}
+
+	private void replaceCanvasWith(BufferedImage im) {
+		if (im != null)
+			this.offscreenMap = im;
+		repaint();
+	}
+
+	private void overlayImageAt(Point p, BufferedImage theImage,
+			boolean repaint, String debugImagename) {
+
+		try {
+
+			Graphics g = offscreenMap.createGraphics();
+
+			g.drawImage(theImage, p.x, p.y, this);
+			g.dispose();
+
+		} catch (NullPointerException n) {
+			n.printStackTrace();
+		}
+
+		try {
+			Thread.sleep(10);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		repaint();
+		if (repaint) {
+			repaint();
+		}
+	}
+
+	private void drawNumberFor(String territory, int number) {
+		territory = territory.toLowerCase();
+		BufferedImage im = this.originalTerritoryImageCache.get(territory);
+		Point drawAt = numeralPoints.get(territory);
+
+		drawNumeral(number + "", drawAt.x, drawAt.y);
+	}
+
+	private void drawNumeral(String numeral, int x, int y) {
+		Graphics g = offscreenMap.createGraphics();
+		g.setColor(Color.WHITE);
+		g.setFont(new Font("Arial", Font.BOLD, 20));
+		g.drawString(numeral, x, y);
+		g.dispose();
+		repaint();
+	}
+
+	private Point centerOfMassFor(String territory, int width, int height) {
+		Point p = territorylocations.get(fieldToFilename(territory));
+		return new Point(p.x + width / 2, p.y + width / 2);
+	}
+
+	private void initializeNumeralPoints() {
+		numeralPoints = (Map<String, Point>) ObjectRW
+				.readObject(NUMERAL_POINTS_FILENAME);
+		rescalePoints(numeralPoints);
+	}
+
+	public static void main(String[] args) {
+		JFrame frame = new JFrame();
+		JPanel panel = new JPanel();
+		panel.setBackground(Color.black);
+		frame.setContentPane(panel);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		GameMapPanel thePanel = new GameMapPanel();
+		panel.add(thePanel);
+		frame.pack();
+		Collection<String> territories = new java.util.ArrayList<String>();
+		territories.add("peru");
+		// thePanel.tintTerritories(territories,Color.orange);
+		frame.setVisible(true);
+
+		for (String s : TerritoryTinter.getAllTerritoriesByStringLowerCase()) {
+			thePanel.drawNumberFor(s, (int) DiceRoll
+					.generateRandomNumber(0, 20));
+		}
+
+		thePanel.initializeOpeningAnimation();
+	}
+
+}
