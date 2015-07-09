@@ -1,0 +1,11 @@
+Observer - this was used when implementing in game statistics.  A Statistics
+class was created to observe the Game class for changes.  When an event in the
+Game warrants an update into one of the many stats the Statsitics class keeps
+track of, the Observeable (Game) notifies the Observer (Statistics) to make
+changes to stats.  The GameStatsFrame observes the Statistics class and paints
+the panel as stats come in from the Game.
+
+Singleton - the Map class is a singleton.  The Map class has a static map instane
+that is constucted only once if when trying to retrieve the map, the map was null.
+A new map is then created - guaranteeing only one instance of it exists during a game.
+You can only get it by calling Map.getInstance().

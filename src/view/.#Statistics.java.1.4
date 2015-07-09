@@ -1,0 +1,85 @@
+package view;
+
+import java.io.Serializable;
+import java.util.Observable;
+import java.util.Observer;
+
+import player.Human;
+import player.Player;
+
+import map.Map;
+import map.Territory;
+
+import base.Game;
+
+public class Statistics extends Observable implements Observer , Serializable{
+	
+	private Game game;
+	private Map map;
+	
+	public static Player winner;
+	public static String totalTimePlayed;
+	public static int roundsPlayed;
+	public static int totalTroopsOwned;
+	public static int totalTroopsEverLived;
+	public static int totalAttacks;
+	public static int totalAttacksWon;
+	public static int totalAttacksLost;
+	public static int totalBattlesWon;
+	public static int totalBattlesLost;
+	public static String mostCurrentFortifiedTerritory;
+	public static String leastCurrentForitifiedTerrritory;
+	public static String mostFortifiedTerritoryAllTime;
+	public static String leastFortifiedTerritoryAllTime;
+	public static String mostAttackedTerritory;
+	public static String mostDefendedTerritory;
+	public static String mostFortifiedContinent;
+	public static String leastForitifiedContinent;
+	public static int totalTroopsKilled;
+	public static int numberTroopsKilled;
+	
+	public Statistics(Game game) {
+		this.game = game;
+		map = this.game.getMap();
+		game.addObserver(this);
+		totalTroopsEverLived = 0;
+		for (Territory t : Map.getTerritories()) {
+			totalTroopsEverLived += t.getTroopsOnTerritory();
+		}
+		totalAttacks = 0;
+		totalAttacksWon = 0;
+		totalAttacksLost = 0;
+		totalBattlesWon = 0;
+		totalBattlesLost = 0;
+		this.update(null, null);
+	}
+
+	public void update(Observable o, Object arg) {
+		double elapsedTimeInSeconds = (System.currentTimeMillis() - Game.startTime) / 1000;
+		totalTimePlayed = ((int)elapsedTimeInSeconds/3600)+" hrs "+((int)elapsedTimeInSeconds / 60)+" mins "+((int)elapsedTimeInSeconds%60) + " secs";
+		roundsPlayed = game.getRound();
+		totalTroopsOwned = 0;
+		for (Territory t : map.getFriendlyTerritories(game.getAllPlayers().get(0))) {
+			totalTroopsOwned += t.getTroopsOnTerritory();
+		}
+		if (arg == StatisticsUpdate.ATTACKING && game.getCurrentPlayer() instanceof Human)
+			totalAttacks++;
+		if (arg == StatisticsUpdate.BATTLE_WON && game.getCurrentPlayer() instanceof Human)
+			totalBattlesWon++;
+		if (arg == StatisticsUpdate.BATTLE_LOST && game.getCurrentPlayer() instanceof Human)
+			totalBattlesLost--;
+		if (arg == StatisticsUpdate.TERRITORY_ATTACKED){
+			mostAttackedTerritory = map.getMostAttackedTerritory();
+			mostDefendedTerritory = map.getMostDefendedTerritory();
+		}
+		
+		mostCurrentFortifiedTerritory = map.getCurrentMostFortified();
+		leastCurrentForitifiedTerrritory = map.getCurrentLeastFortified();
+		mostFortifiedTerritoryAllTime = map.getMostFortifiedTAllTime();
+		leastFortifiedTerritoryAllTime = map.getLeastFortifiedTAllTime();
+		
+		this.setChanged();
+		this.notifyObservers();
+	}
+
+}

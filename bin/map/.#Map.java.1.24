@@ -1,0 +1,384 @@
+package map;
+
+import java.util.ArrayList;
+
+import player.Player;
+
+/**
+ * Represents the entire game board. It is composed of all the continents and
+ * territories.
+ * 
+ * @author Duong Pham
+ * @version April 11, 2009
+ * 
+ */
+public class Map {
+
+	// We need a graph to know some things.
+	private static final Graph GRAPH = new Graph();
+	private static ArrayList<Continent> continentsList;
+	private static ArrayList<Territory> territoryList;
+	private Object lock = new Object();
+
+	/**
+	 * This is the constructor. Make continents (add the territories to the
+	 * continents) and have Map carry an instance of it.
+	 * 
+	 */
+	public Map() {
+		continentsList = new ArrayList<Continent>();
+		territoryList = new ArrayList<Territory>();
+		
+		Continent northAmerica = new Continent(Continents.NORTH_AMERICA, 5);
+		Continent southAmerica = new Continent(Continents.SOUTH_AMERICA, 2);
+		Continent europe = new Continent(Continents.EUROPE, 5);
+		Continent africa = new Continent(Continents.AFRICA, 3);
+		Continent asia = new Continent(Continents.ASIA, 7);
+		Continent oceania = new Continent(Continents.OCEANIA, 2);
+
+		// NORTH_AMERICA
+		for (int i = 1; i < 10; i++) {
+			Territory t = new Territory(northAmerica, i);
+			northAmerica.addTerritory(t);
+			territoryList.add(t);
+		}
+
+		// SOUTH_AMERICA
+		for (int i = 10; i < 14; i++) {
+			Territory t = new Territory(southAmerica, i);
+			southAmerica.addTerritory(t);
+			territoryList.add(t);
+			t.setWikiValue(i%9);
+		}
+
+		// EUROPE
+		for (int i = 14; i < 21; i++) {
+			Territory t = new Territory(europe, i);
+			europe.addTerritory(t);
+			territoryList.add(t);
+			t.setWikiValue(i%13);
+		}
+
+		// AFRICA
+		for (int i = 21; i < 27; i++) {
+			Territory t = new Territory(africa, i);
+			africa.addTerritory(t);
+			territoryList.add(t);
+			t.setWikiValue(i%20);
+		}
+
+		// ASIA
+		for (int i = 27; i < 39; i++) {
+			Territory t = new Territory(asia, i);
+			asia.addTerritory(t);
+			territoryList.add(t);
+			t.setWikiValue(i%26);
+		}
+
+		// OCEANIA
+		for (int i = 39; i < 43; i++) {
+			Territory t = new Territory(oceania, i);
+			oceania.addTerritory(t);
+			territoryList.add(t);
+			t.setWikiValue(i%38);
+		}
+
+		continentsList.add(northAmerica);
+		continentsList.add(southAmerica);
+		continentsList.add(europe);
+		continentsList.add(africa);
+		continentsList.add(asia);
+		continentsList.add(oceania);
+	}
+
+	/**
+	 * Returns the list of continents.
+	 * 
+	 * @return the list of continents.
+	 */
+	public ArrayList<Continent> getContinents() {
+		return continentsList;
+	}
+
+	/**
+	 * Returns all territories.
+	 * 
+	 * @return the list of all territories.
+	 */
+	public static ArrayList<Territory> getTerritories() {
+		return territoryList;
+	}
+	
+	/**
+	 * Returns Continent of that name.
+	 * 
+	 * @param name
+	 * 			the name you give.
+	 * @return the Continent with that name.
+	 */
+	public static Continent getContinentByName(String name) {
+		for (Continent c : continentsList) {
+			if (c.getName().equalsIgnoreCase(name)) {
+				return c;
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Returns Territory of that name.
+	 * 
+	 * @param name
+	 * 			the name you give.
+	 * @return the Territory with that name.
+	 */
+	public static Territory getTerritoryByName(String name) {
+		for (Territory t : territoryList) {
+			if (t.getName().equalsIgnoreCase(name)) {
+				return t;
+			}
+		}
+		throw new IllegalArgumentException("NO SUCH NAME: " + name);
+	}
+	
+	/**
+	 * Returns the Continenet if you know it's identification number.
+	 * 
+	 * @param continentIDNum
+	 * 			the Continent's number.
+	 * @return the Continent with that number.
+	 */
+	public static Continent getContinentByID(int continentIDNum) {
+		// Subtract by 1 because continents are indexed at 1
+		return continentsList.get(continentIDNum-1);
+	}
+	
+	/**
+	 * Returns the Territory if you know it's idnetification number.
+	 * 
+	 * @param territoryIDNum
+	 * 			the Territory's number.
+	 * @return the Territory with that number.
+	 */
+	public static Territory getTerritoryByID(int territoryIDNum) {
+		// Subtract by 1 because continents are indexed at 1
+		return territoryList.get(territoryIDNum-1);
+	}
+	
+	/**
+	 * Returns a list of all conquered Continents under the players possesion.
+	 * 
+	 * @param player
+	 * 			the player to search on behalf of.
+	 * @return the list of conquered continents.
+	 */
+	public ArrayList<Continent> getConqueredContinents(Player player) {
+		ArrayList<Continent> conqueredContinentList = new ArrayList<Continent>();
+		for (Continent c : continentsList) {
+			if (c.isConquered() && c.getConqueredBy().equals(player)) {
+				conqueredContinentList.add(c);
+			}
+		}
+		return conqueredContinentList;
+	}
+	
+	/**
+	 * Returns a list of all conquered Continents. Non-conquered Continents are
+	 * still up for grabs.
+	 * 
+	 * @return the list of all conquered continents.
+	 */
+	public ArrayList<Continent> getConqueredContinents() {
+		ArrayList<Continent> conqueredList = new ArrayList<Continent>();
+		for (Continent c : continentsList) {
+			if (c.isConquered()) {
+				conqueredList.add(c);
+			}
+		}
+		return conqueredList;
+	}
+
+	/**
+	 * Return the list of friendly territories.
+	 * 
+	 * @param player
+	 *            the player to look on behalf of.
+	 * @return a list of friendly territories.
+	 */
+	public ArrayList<Territory> getFriendlyTerritories(Player player) {
+		ArrayList<Territory> friendlyList = new ArrayList<Territory>();
+		for (Continent c : continentsList) {
+			
+			for (Territory t : c.getTerritoryList()) {
+				if (t.getPlayer()==(player))
+					friendlyList.add(t);
+			}
+		}
+		return friendlyList;
+	}
+	
+	/**
+	 * Returns adjacent friendly territories.
+	 * 
+	 * @param territory
+	 * 			the one to check for.
+	 * @return the list of adjacent friendly territories.
+	 */
+	public ArrayList<Territory> getAdjacentFriendlyTerritories(Territory territory) {
+		ArrayList<Territory> terr = getEnemyTerritories(territory.getPlayer());
+		for (Territory t : terr) {
+			if (!areAdjacent(territory, t)) {
+				terr.remove(t);
+			}
+		}
+		return terr;
+
+	}
+	
+	/**
+	 * Returns adjacent enemy territories.
+	 * 
+	 * @param territory
+	 * 			the one to check for.
+	 * @return the list of adjancent enemy territories
+	 */
+	public ArrayList<Territory> getAdjacentEnemyTerritories(Territory territory) {
+		ArrayList<Territory> terr = getFriendlyTerritories(territory.getPlayer());
+		// dont remove in a enhanced for loop
+		for (int i = 0; i < terr.size(); i++) {
+			if (!areAdjacent(territory, terr.get(i))) {
+				terr.remove(terr.get(i));
+			}
+		}
+		return terr;
+	}
+
+	/**
+	 * Return the list of enemy territories.
+	 * 
+	 * @param player
+	 *            the player to look on behalf of.
+	 * @return a list of enemy territories.
+	 */
+	public ArrayList<Territory> getEnemyTerritories(Player player) {
+		ArrayList<Territory> enemyList = new ArrayList<Territory>();
+		for (Continent c : continentsList) {
+			for (Territory t : c.getTerritoryList()) {
+				if (!t.getPlayer().equals(player))
+					enemyList.add(t);
+			}
+		}
+		return enemyList;
+	}
+
+	/**
+	 * Returns a list of all adjacent territories. Adjacent territories are ones
+	 * that you can reach from that territory.
+	 * 
+	 * @param territory
+	 *            the territory you are asking on behalf of.
+	 * @return list of all adjacent territories.
+	 */
+	public static ArrayList<Territory> getAdjacentTerritories(Territory territory) {
+		ArrayList<Integer> adjacentTerritoriesNum = new ArrayList<Integer>();
+		ArrayList<Territory> adjacentTerritories = new ArrayList<Territory>();
+		int territoryNum = territory.getIdentificationNum();
+		adjacentTerritoriesNum = GRAPH.getAdjacentList(territoryNum);
+		for (Integer i : adjacentTerritoriesNum) {
+			for (Territory t : territoryList) {
+				if (t.getIdentificationNum() == i) {
+					adjacentTerritories.add(t);
+				}
+			}
+		}
+		return adjacentTerritories;
+	}
+	
+	/**
+	 * Determines if two territories are adjacent.
+	 * 
+	 * @param territory1
+	 * 			The first territory.
+	 * @param territory2
+	 * 			The second territory.
+	 * @return true if adjacent, false otherwise.
+	 */
+	public static boolean areAdjacent(Territory territory1, Territory territory2) {
+		return (getAdjacentTerritories(territory1).contains(territory2));
+	}
+
+	/**
+	 * Returns if the player has been defeated.  If the player has 0 friendly territories.
+	 * 
+	 * @param player
+	 * 			the player to check for.
+	 * @return true if can attack, false otherwise.
+	 */
+	public boolean isDefeated(Player player) {
+		return getFriendlyTerritories(player).size() == 0;
+	}
+
+	
+	/**
+	 * Returns if the player can attack.  If they have a territory with at least 2 troops.
+	 * 
+	 * @param player
+	 * 			the player to check for.
+	 * @return true if can attack, false otherwise.
+	 */
+	public boolean canAttack(Player player) {
+		if (enoughTroopsToAttack(player) == false) {
+			System.out.println(player.getName() + " can't not enough troops");
+			return false;
+		}
+		if (canAttackInsurroundedSituation(player) == false) {
+			System.out.println(player.getName() + " can't surrounded situation");
+			return false;
+		}
+		System.out.println(player.getName() + " can attack");
+		return true;
+	}
+	
+	/**
+	 * Returns if all the territories are occupied.
+	 * 
+	 * @return true if all territories are occupied, false otherwise.
+	 */
+	public boolean areAllOccupied() {
+		for (Territory t : territoryList) {
+			if (!t.isOccupied()) {
+				return false;
+			}
+		}
+		return true;	
+	}
+	
+	/**
+	 * Returns if can attack in a surrounded situation.
+	 * 
+	 * @param player
+	 * 			the plauer to check on behalf of.
+	 * @return true if found a possible attack, false otherwise.
+	 */
+	public boolean canAttackInsurroundedSituation(Player player) {
+		for (Territory t1 : player.getTerritoriesOwned()) {
+			ArrayList<Territory> adjEnemies = getAdjacentEnemyTerritories(t1);
+			if (adjEnemies.size() >= 1 && t1.getTroopsOnTerritory() > 1) {
+				return true; // possible attack available
+			}
+		}
+		return false;
+	}
+	
+	public boolean enoughTroopsToAttack(Player player) {
+		int count = 0;
+		for(Territory territory : getFriendlyTerritories(player)) {
+			count += territory.getTroopsOnTerritory();
+		}
+		if (count <= getFriendlyTerritories(player).size()) {
+			return false;
+		}
+		return true;
+	}
+	
+}

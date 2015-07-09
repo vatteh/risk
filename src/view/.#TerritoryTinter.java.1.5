@@ -1,0 +1,209 @@
+package view;
+
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import java.awt.image.FilteredImageSource;
+import java.awt.image.RGBImageFilter;
+import java.io.File;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+import map.Territories;
+
+/**
+ * 
+ *An implementation of an imagefilter that is used to Highlight and color
+ * territories.
+ * 
+ * @author Phil
+ * 
+ */
+public class TerritoryTinter extends RGBImageFilter {
+
+	private int tintR;
+	private int tintB;
+	private int tintG;
+	private double lum;
+	Set<String> filenames;
+
+	public static final String TERRITORY_DIRECTORY = "territories(greyscale)";
+	public static final String TERRITORY_EXT = ".png";
+
+	public TerritoryTinter(Color c, double lum) {
+		int rgb = c.getRGB();
+		tintR = (rgb >> 16) & 0xff;
+		tintG = (rgb >> 8) & 0xff;
+		tintB = rgb & 0xff;
+		this.lum = lum;
+		filenames = getAllTerritoriesByString();
+	}
+
+	/**
+	 * Takes a collection of images and tints them to new images.
+	 * 
+	 * @param originalImages
+	 *            - the original set of image to tint
+	 * @param c
+	 *            - the color to tint
+	 * @return - a List containing the tinted images (new instances)
+	 */
+	public static List<BufferedImage> tintImages(
+			Collection<BufferedImage> originalImages, Color c) {
+
+		Container con = new Container();
+		RGBImageFilter filter = new TerritoryTinter(c, .5);
+
+		List<BufferedImage> newList = new ArrayList(originalImages.size());
+
+		for (BufferedImage i : originalImages) {
+			FilteredImageSource fis = new FilteredImageSource(i.getSource(),
+					filter);
+			BufferedImage newImage = tintImage(con, fis);
+			newList.add(newImage);
+		}
+
+		return newList;
+	}
+	
+	/**
+	 * When you select the territory, this will make the image darker in color
+	 * 
+	 * @param mapping - Map of images to make darker.
+	 * @param c - the color the make darker
+	 * @return Map<String,BufferedImage> - darken images
+	 */
+	public static Map<String,BufferedImage> tintImages(Map<String,BufferedImage> mapping,Color c){
+		Container con = new Container();
+		RGBImageFilter filter = new TerritoryTinter(c, .5);
+
+		for(String entry : mapping.keySet()){
+			
+			BufferedImage im = mapping.get(entry);
+			FilteredImageSource fis = new FilteredImageSource(im.getSource(),
+					filter);
+			BufferedImage newImage = tintImage(con, fis);
+			mapping.put(entry,newImage);
+		}
+		return mapping;
+	}
+
+	private static BufferedImage tintImage(Container con,
+			FilteredImageSource fis) {
+		return BufferedImageFactory.createBufferedImage(con.createImage(fis),
+				con);
+	}
+
+	/**
+	 * Uses reflection to retrieve an array of fields from the namespace
+	 * contained in map.Territories to create a set of all territory names used
+	 * in this game
+	 * 
+	 * @return - the set of territory names
+	 */
+	public static Set<String> getAllTerritoriesByString() {
+
+		Field[] keys = Territories.class.getDeclaredFields();
+
+		Set<String> theSet = new HashSet();
+
+		for (Field f : keys) {
+			theSet.add(f.getName());
+		}
+
+		return theSet;
+
+	}
+	
+	/**
+	 * Returns all territories to their lower case form.
+	 * @return a set of Strings in lower case
+	 */
+	protected static Set<String> getAllTerritoriesByStringLowerCase(){
+		Field[] keys = Territories.class.getDeclaredFields();
+
+		Set<String> theSet = new HashSet();
+
+		for (Field f : keys) {
+			if(!f.getName().equals("serialVersionUID")){
+			theSet.add(f.getName().toLowerCase());
+			}
+		}
+
+		return theSet;
+	}
+
+	/**
+	 * Filters the given color
+	 */
+	public int filterRGB(int x, int y, int argb) {
+		int alpha = (argb >> 24) & 0xff;
+		int red = (argb >> 16) & 0xff;
+		int green = (argb >> 8) & 0xff;
+		int blue = argb & 0xff;
+		double lum = (0.2989 * red + 0.5866 * green + 0.1144 * blue) / 255;
+		double scale = 1 - (4 * ((lum-.5) * (lum-.5)));
+
+		red = (int) (tintR * scale + red * (1 - scale));
+		green = (int) (tintG * scale + green * (1 - scale));
+		blue = (int) (tintB * scale + blue * (1 - scale));
+		return (alpha << 24) | (red << 16) | (green << 8) | blue;
+	}
+
+	/**
+	 * Set up a GUI Test for this module
+	 * 
+	 * @param args
+	 */
+	public static void main(String[] args) {
+
+		JFrame frame = new JFrame();
+		JPanel panel = new JPanel();
+		panel.setBackground(Color.black);
+		frame.setContentPane(panel);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+		frame.setSize(1000, 200);
+
+		Set<String> keys = TerritoryTinter.getAllTerritoriesByString();
+
+		Set<BufferedImage> imageSet = new HashSet();
+
+		for (String s : keys) {
+
+			Image next = null;
+			try {
+				next = ImageIO.read(new File((TERRITORY_DIRECTORY + "/"
+						+ s.toLowerCase() + TERRITORY_EXT)));
+			} catch (Exception e) {
+				System.out.println("prob w/"+s.toLowerCase());
+			}
+			if (next != null) {
+				imageSet.add((BufferedImage) next);
+			}
+		}
+		frame.setVisible(true);
+
+		List<BufferedImage> list = TerritoryTinter.tintImages(imageSet,
+				Color.BLUE);
+
+		for (BufferedImage img : list) {
+			JButton b = new JButton();
+			b.setIcon(new ImageIcon(img));
+			panel.add(b);
+		}
+
+	}
+}
